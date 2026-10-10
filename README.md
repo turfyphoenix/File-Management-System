@@ -1,7 +1,7 @@
 Filekeeper
 A small Python program that creates, reads, updates and deletes text files from a numbered terminal menu.
 
-Live demo and code walkthrough: https://YOUR-USERNAME.github.io/YOUR-REPO/
+Live demo and code walkthrough:  https://github.com/turfyphoenix/File-Management-System)
 
 Run it
 You need Python 3. There are no packages to install.
