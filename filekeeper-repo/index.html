@@ -1,0 +1,988 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Filekeeper: a Python file manager for the terminal</title>
+<meta name="description" content="Filekeeper is a small Python program that creates, reads, updates and deletes text files from a numbered menu. Try the demo, step through the code and read the full source.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Filekeeper: a Python file manager for the terminal">
+<meta property="og:description" content="Create, read, update and delete text files from one numbered menu. Try the demo and step through the code.">
+<style>
+:root {
+  color-scheme: light;
+
+  /* colour */
+  --bg: #F2EEE5;
+  --bg-raised: #F8F5EE;
+  --ink: #1D1C19;
+  --ink-2: #4A4740;
+  --rule: #D5CFC0;
+  --accent: #24594A;
+  --accent-deep: #1B463A;
+  --accent-ink: #F8F5EE;
+  --term-bg: #1E1D1A;
+  --term-ink: #ECE7DA;
+  --term-dim: #A39E8E;
+  --term-accent: #8FC4AE;
+  --term-rule: #3A3833;
+
+  /* shape and space */
+  --radius: 3px;
+  --gutter: clamp(16px, 4vw, 40px);
+  --max: 1120px;
+  --section-pad: clamp(2.5rem, 6vw, 4.5rem);
+
+  /* type */
+  --font-display: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  --font-body: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  * { transition: none !important; animation: none !important; }
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 400 1.0625rem/1.6 var(--font-body);
+}
+
+h1, h2, h3 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  line-height: 1.12;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+h1 { font-size: clamp(2.25rem, 5.2vw, 3.75rem); line-height: 1.04; }
+h2 { font-size: clamp(1.6rem, 3vw, 2.1rem); }
+h3 { font-size: 1.15rem; }
+
+p { margin: 0; }
+a { color: var(--accent); text-underline-offset: 3px; }
+a:hover { color: var(--accent-deep); }
+
+code, pre, kbd { font-family: var(--font-mono); }
+code { font-size: 0.9em; background: var(--bg-raised); border: 1px solid var(--rule); border-radius: var(--radius); padding: 0.05em 0.35em; }
+
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
+.skip {
+  position: absolute; left: var(--gutter); top: -4rem;
+  background: var(--ink); color: var(--bg); padding: 0.6rem 1rem; border-radius: var(--radius);
+  z-index: 10;
+}
+.skip:focus { top: 0.5rem; }
+
+.wrap { max-width: var(--max); margin-inline: auto; padding-inline: var(--gutter); }
+
+/* header */
+.site-header { border-bottom: 1px solid var(--rule); }
+.bar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; min-height: 4rem; flex-wrap: wrap; padding-block: 0.5rem; }
+.wordmark { font-family: var(--font-display); font-size: 1.35rem; font-weight: 600; color: var(--ink); text-decoration: none; letter-spacing: -0.01em; }
+.wordmark:hover { color: var(--ink); }
+.nav { display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap; }
+.nav a:not(.btn) { color: var(--ink-2); text-decoration: none; font-size: 0.95rem; padding-block: 0.5rem; }
+.nav a:not(.btn):hover { color: var(--ink); text-decoration: underline; }
+
+/* buttons */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 44px; padding: 0 1.15rem;
+  border: 1px solid var(--ink); border-radius: var(--radius);
+  background: transparent; color: var(--ink);
+  font: 500 0.95rem/1 var(--font-body); text-decoration: none; cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+.btn:hover { background: var(--ink); color: var(--bg); }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn-primary:hover { background: var(--accent-deep); border-color: var(--accent-deep); color: var(--accent-ink); }
+.btn-small { min-height: 40px; padding: 0 0.85rem; font-size: 0.875rem; }
+.btn[disabled] { opacity: 0.5; cursor: not-allowed; }
+
+/* hero */
+.hero { display: grid; gap: 2.5rem; padding-block: clamp(2.25rem, 6vw, 5rem); }
+@media (min-width: 960px) {
+  .hero { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 3.5rem; align-items: start; }
+}
+.eyebrow { font: 500 0.8125rem/1.4 var(--font-mono); color: var(--accent); margin-bottom: 1.1rem; }
+.lede { font-size: 1.2rem; color: var(--ink-2); margin-top: 1.25rem; max-width: 34rem; }
+.actions { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 1.75rem; }
+.fine { font-size: 0.9rem; color: var(--ink-2); margin-top: 1.25rem; max-width: 30rem; }
+
+/* demo */
+.demo-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem 1rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+.demo-note { font-size: 0.9rem; color: var(--ink-2); margin-bottom: 0.9rem; max-width: 40rem; }
+.terminal { background: var(--term-bg); color: var(--term-ink); border-radius: var(--radius); overflow: hidden; }
+.screen {
+  height: min(26rem, 62vh); overflow: auto; padding: 1rem;
+  font: 400 0.875rem/1.55 var(--font-mono);
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.screen:focus-visible { outline-color: var(--term-accent); outline-offset: -3px; }
+.line { min-height: 1.55em; }
+.line .p { color: var(--term-dim); }
+.line .echo { color: var(--term-accent); }
+.line .echo.gap { margin-left: 0.6ch; }
+.term-form { display: flex; align-items: center; gap: 0.5rem; border-top: 1px solid var(--term-rule); padding: 0.4rem 0.75rem; }
+.term-form:focus-within { outline: 2px solid var(--term-accent); outline-offset: -2px; }
+.caret { color: var(--term-accent); font: 500 1rem var(--font-mono); }
+.term-form input {
+  flex: 1; min-width: 0; background: transparent; border: 0; color: var(--term-ink);
+  font: 400 1rem var(--font-mono); padding: 0.65rem 0.25rem;
+}
+.term-form input:focus-visible { outline: none; }
+.term-form input:disabled { opacity: 0.5; }
+.btn-send { border-color: var(--term-dim); color: var(--term-ink); }
+.btn-send:hover { background: var(--term-ink); color: var(--term-bg); border-color: var(--term-ink); }
+
+.files { margin-top: 1.25rem; }
+.files h3 { font-size: 1rem; margin-bottom: 0.5rem; }
+.files .empty { color: var(--ink-2); font-size: 0.95rem; }
+.files ul { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--rule); }
+.files li { display: flex; justify-content: space-between; gap: 1rem; padding: 0.55rem 0; border-bottom: 1px solid var(--rule); font: 400 0.875rem var(--font-mono); overflow-wrap: anywhere; }
+.files li span:last-child { color: var(--ink-2); flex-shrink: 0; }
+
+/* sections */
+.split { display: grid; gap: 1.5rem; padding-block: var(--section-pad); border-top: 1px solid var(--rule); }
+@media (min-width: 900px) { .split { grid-template-columns: minmax(0, 4fr) minmax(0, 8fr); gap: 3rem; } }
+.split .intro p { color: var(--ink-2); margin-top: 0.9rem; max-width: 24rem; }
+
+.ops { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--rule); }
+.ops li { display: grid; grid-template-columns: 2.75rem minmax(0, 1fr); gap: 0.75rem; padding: 1.1rem 0; border-bottom: 1px solid var(--rule); }
+.ops .num { font: 500 0.95rem var(--font-mono); color: var(--accent); padding-top: 0.15rem; }
+.ops h3 { font-family: var(--font-body); font-weight: 600; font-size: 1.05rem; letter-spacing: 0; }
+.ops p { color: var(--ink-2); margin-top: 0.3rem; }
+
+.steps { list-style: none; margin: 0; padding: 0; counter-reset: s; border-top: 1px solid var(--rule); }
+.steps li { padding: 1.1rem 0; border-bottom: 1px solid var(--rule); }
+.steps p { color: var(--ink-2); margin-bottom: 0.6rem; }
+.cmd { display: block; background: var(--term-bg); color: var(--term-ink); border: 0; padding: 0.8rem 1rem; font: 400 0.9rem var(--font-mono); overflow-x: auto; border-radius: var(--radius); }
+
+.notes { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--rule); }
+.notes li { padding: 1rem 0; border-bottom: 1px solid var(--rule); color: var(--ink-2); }
+.notes strong { color: var(--ink); font-weight: 600; }
+
+.source-block { padding-block: var(--section-pad); border-top: 1px solid var(--rule); }
+.source-head { display: flex; align-items: end; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.25rem; }
+.source-head p { color: var(--ink-2); margin-top: 0.5rem; }
+.code {
+  margin: 0; background: var(--term-bg); color: var(--term-ink); padding: 1.25rem;
+  overflow: auto; font: 400 0.8125rem/1.65 var(--font-mono); border-radius: var(--radius);
+  max-height: 34rem; tab-size: 4;
+}
+.code code { background: none; border: 0; border-radius: 0; padding: 0; font-size: inherit; color: inherit; }
+.code:focus-visible { outline-color: var(--term-accent); outline-offset: -3px; }
+
+/* footer */
+.site-footer { border-top: 1px solid var(--rule); padding-block: 2rem 3rem; font-size: 0.925rem; color: var(--ink-2); }
+.foot { display: flex; justify-content: space-between; gap: 1rem 2rem; flex-wrap: wrap; }
+.foot nav { display: flex; gap: 1.25rem; flex-wrap: wrap; }
+
+/* hero accent word */
+.hl { color: var(--accent); }
+
+/* demo extras */
+.demo-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: flex-end; }
+.btn-fill { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn-fill:hover { background: var(--accent-deep); border-color: var(--accent-deep); color: var(--accent-ink); }
+.quick { display: flex; gap: 0.4rem; flex-wrap: wrap; padding: 0.6rem 0.75rem; border-top: 1px solid var(--term-rule); }
+.quick button {
+  min-height: 36px; padding: 0 0.7rem; background: transparent; color: var(--term-ink);
+  border: 1px solid var(--term-rule); border-radius: var(--radius);
+  font: 400 0.8125rem var(--font-mono); cursor: pointer;
+}
+.quick button:hover:not(:disabled) { border-color: var(--term-accent); color: var(--term-accent); }
+.quick button:focus-visible { outline-color: var(--term-accent); }
+.quick button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* facts strip */
+.facts { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: 1px solid var(--ink); border-bottom: 1px solid var(--rule); }
+@media (min-width: 720px) { .facts { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.facts li { padding: 1.4rem 1rem 1.4rem 0; display: flex; flex-direction: column; gap: 0.2rem; }
+.facts .big { font: 500 clamp(2.4rem, 5vw, 3.4rem)/1 var(--font-display); letter-spacing: -0.02em; color: var(--ink); }
+.facts .cap { font-size: 0.9rem; color: var(--ink-2); }
+
+/* dry run */
+.trace-block { background: var(--bg-raised); border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); padding-block: var(--section-pad); }
+.trace-head { max-width: 40rem; margin-bottom: 2rem; }
+.trace-head p { color: var(--ink-2); margin-top: 0.8rem; }
+.trace { display: grid; gap: 1.5rem; }
+@media (min-width: 900px) { .trace { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 2.5rem; align-items: start; } }
+.trace-code { max-height: none; padding: 1rem 0.75rem; }
+.ln { display: block; padding: 0 0.5rem; white-space: pre; }
+.ln .no { display: inline-block; width: 2.2ch; margin-right: 1.5ch; text-align: right; color: var(--term-dim); user-select: none; }
+.ln.on { background: #3A3833; }
+.ln.on .no { color: var(--term-accent); }
+.trace-run { font: 500 0.8125rem var(--font-mono); color: var(--accent); margin-bottom: 0.6rem; min-height: 1.4em; }
+.trace-side h3 { font-size: 1.35rem; margin-bottom: 0.5rem; }
+.trace-text { color: var(--ink-2); min-height: 6.4em; }
+.vars { margin: 1.25rem 0; border-top: 1px solid var(--rule); }
+.vars > div { display: flex; justify-content: space-between; gap: 1rem; padding: 0.6rem 0; border-bottom: 1px solid var(--rule); }
+.vars dt { font: 400 0.875rem var(--font-mono); color: var(--ink-2); }
+.vars dd { margin: 0; font: 500 0.875rem var(--font-mono); text-align: right; overflow-wrap: anywhere; }
+.trace-controls { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+.trace-count { font: 400 0.875rem var(--font-mono); color: var(--ink-2); flex: 1; text-align: center; }
+
+/* dark source band */
+.band-dark { background: var(--term-bg); color: var(--term-ink); padding-block: var(--section-pad); }
+.band-dark h2 { color: var(--term-ink); }
+.band-dark .source-head p { color: var(--term-dim); }
+.btn-light { background: var(--bg-raised); border-color: var(--bg-raised); color: var(--accent-deep); }
+.btn-light:hover { background: var(--term-ink); border-color: var(--term-ink); color: var(--term-bg); }
+.band-dark .btn-light { color: var(--term-bg); }
+.code-deep { background: #151411; border: 1px solid var(--term-rule); }
+
+/* closing accent band */
+.band-accent { background: var(--accent); color: var(--accent-ink); padding-block: clamp(2.5rem, 6vw, 4rem); }
+.cta { display: flex; align-items: center; justify-content: space-between; gap: 1.5rem 3rem; flex-wrap: wrap; }
+.cta h2 { color: var(--accent-ink); }
+.cta p { margin-top: 0.7rem; max-width: 36rem; color: #DCE8E2; }
+.band-accent .btn-light:hover { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+.band-accent :focus-visible { outline-color: var(--accent-ink); }
+
+@media (max-width: 520px) {
+  .demo-head { align-items: flex-start; }
+  .nav { gap: 0.9rem; }
+  .ops li { grid-template-columns: 2rem minmax(0, 1fr); }
+}
+
+</style>
+</head>
+<body id="top">
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="site-header">
+  <div class="wrap bar">
+    <a class="wordmark" href="#top">Filekeeper</a>
+    <nav class="nav" aria-label="Primary">
+      <a href="#demo">Demo</a>
+      <a href="#trace-sec">Dry run</a>
+      <a href="#source">Source</a>
+      <a class="btn btn-small" href="https://github.com/YOUR-USERNAME/YOUR-REPO">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+  <div class="wrap hero">
+    <div class="hero-copy">
+      <p class="eyebrow">Python 3, standard library only</p>
+      <h1>Manage text files from one <span class="hl">numbered menu.</span></h1>
+      <p class="lede">Filekeeper is a small Python program that creates, reads, updates and deletes text files from the terminal. Pick a number, answer the prompts, and it does the rest.</p>
+      <div class="actions">
+        <a class="btn btn-primary" href="https://github.com/YOUR-USERNAME/YOUR-REPO">View source on GitHub</a>
+        <a class="btn" href="#demo">Try the demo</a>
+      </div>
+      <p class="fine">It needs Python 3 and nothing else. There are no packages to install.</p>
+    </div>
+
+    <section id="demo" aria-labelledby="demo-title">
+      <div class="demo-head">
+        <h2 id="demo-title">Live demo</h2>
+        <div class="demo-actions">
+          <button type="button" class="btn btn-small btn-fill" id="play" aria-pressed="false">Play sample session</button>
+          <button type="button" class="btn btn-small" id="restart">Restart</button>
+        </div>
+      </div>
+      <p class="demo-note">Simulated in your browser. It follows the program's prompts and messages, but the files live only in this page's memory and disappear when you reload.</p>
+      <div class="terminal">
+        <div class="screen" id="screen" role="log" aria-label="Program output" tabindex="0"></div>
+        <div class="quick" id="quick" role="group" aria-label="Menu shortcuts">
+          <button type="button" data-v="1">1 Create</button>
+          <button type="button" data-v="2">2 Read</button>
+          <button type="button" data-v="3">3 Update</button>
+          <button type="button" data-v="4">4 Delete</button>
+          <button type="button" data-v="5">5 Exit</button>
+        </div>
+        <form class="term-form" id="term-form" autocomplete="off">
+          <label class="sr-only" for="term-input">Type your answer and press Enter</label>
+          <span class="caret" aria-hidden="true">&gt;</span>
+          <input id="term-input" type="text" spellcheck="false" autocapitalize="off" autocorrect="off" maxlength="200">
+          <button class="btn btn-small btn-send" id="term-send" type="submit">Send</button>
+        </form>
+      </div>
+      <div class="files">
+        <h3>Files in this demo</h3>
+        <p class="empty" id="file-empty">No files yet. Choose 1 at the menu to create one.</p>
+        <ul id="file-list"></ul>
+      </div>
+      <p class="sr-only" id="term-status" role="status"></p>
+    </section>
+  </div>
+
+  <div class="wrap">
+    <ul class="facts" aria-label="Project facts">
+      <li><span class="big">104</span><span class="cap">lines of Python</span></li>
+      <li><span class="big">4</span><span class="cap">file operations</span></li>
+      <li><span class="big">0</span><span class="cap">packages to install</span></li>
+      <li><span class="big">1</span><span class="cap">file to copy</span></li>
+    </ul>
+
+    <section class="split" id="options" aria-labelledby="options-title">
+      <div class="intro">
+        <h2 id="options-title">Five menu options</h2>
+        <p>Each one asks for what it needs, one prompt at a time, then goes back to the menu.</p>
+      </div>
+      <ol class="ops">
+        <li>
+          <span class="num">1</span>
+          <div>
+            <h3>Create a file</h3>
+            <p>Asks for a file name. If a file with that name already exists it stops and tells you, so nothing gets overwritten. Otherwise it asks for the text and writes it.</p>
+          </div>
+        </li>
+        <li>
+          <span class="num">2</span>
+          <div>
+            <h3>Read a file</h3>
+            <p>Asks for a file name and prints what is inside. If the file does not exist, it says so.</p>
+          </div>
+        </li>
+        <li>
+          <span class="num">3</span>
+          <div>
+            <h3>Update a file</h3>
+            <p>Rename the file, append a line to the end, or overwrite the contents. A rename is refused when the new name is already taken.</p>
+          </div>
+        </li>
+        <li>
+          <span class="num">4</span>
+          <div>
+            <h3>Delete a file</h3>
+            <p>Removes the file by name. There is no confirmation prompt, so check the name before you press Enter.</p>
+          </div>
+        </li>
+        <li>
+          <span class="num">5</span>
+          <div>
+            <h3>Exit</h3>
+            <p>Ends the menu loop and closes the program.</p>
+          </div>
+        </li>
+      </ol>
+    </section>
+  </div>
+
+  <section class="trace-block" id="trace-sec" aria-labelledby="trace-title">
+    <div class="wrap">
+      <div class="trace-head">
+        <h2 id="trace-title">Dry run of option 1</h2>
+        <p>Step through <code>createfile()</code> one line at a time and watch the variables change. The first run creates <code>notes.txt</code>. The second run tries the same name again.</p>
+      </div>
+      <div class="trace" id="trace">
+        <pre class="code trace-code" aria-label="The createfile function with line numbers"><code><span class="ln" data-n="3"><span class="no">3</span>def createfile():</span><span class="ln" data-n="4"><span class="no">4</span>    try:</span><span class="ln" data-n="5"><span class="no">5</span>        filename = input("Enter the filename: ")</span><span class="ln" data-n="6"><span class="no">6</span>        path  = Path(filename)</span><span class="ln" data-n="7"><span class="no">7</span>        if not path.exists():</span><span class="ln" data-n="8"><span class="no">8</span>            with open(filename, "w") as fs:</span><span class="ln" data-n="9"><span class="no">9</span>                data = input("Enter the data to be written in the file")</span><span class="ln" data-n="10"><span class="no">10</span>                fs.write(data)</span><span class="ln" data-n="11"><span class="no">11</span>        else:</span><span class="ln" data-n="12"><span class="no">12</span>            print("File already exists")</span><span class="ln" data-n="13"><span class="no">13</span>    except Exception as err:</span><span class="ln" data-n="14"><span class="no">14</span>        print(f"An error has occured {err}")</span></code></pre>
+        <div class="trace-side">
+          <p class="trace-run" id="t-run"></p>
+          <div role="status" aria-live="polite">
+            <h3 id="t-title"></h3>
+            <p class="trace-text" id="t-text"></p>
+          </div>
+          <dl class="vars">
+            <div><dt>filename</dt><dd id="v-filename"></dd></div>
+            <div><dt>path.exists()</dt><dd id="v-exists"></dd></div>
+            <div><dt>data</dt><dd id="v-data"></dd></div>
+            <div><dt>notes.txt on disk</dt><dd id="v-disk"></dd></div>
+          </dl>
+          <div class="trace-controls">
+            <button type="button" class="btn btn-small" id="t-prev">Previous</button>
+            <span class="trace-count" id="t-count"></span>
+            <button type="button" class="btn btn-small btn-fill" id="t-next">Next step</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="wrap">
+    <section class="split" id="run" aria-labelledby="run-title">
+      <div class="intro">
+        <h2 id="run-title">Run it yourself</h2>
+        <p>Files are created in the folder you start the program from.</p>
+      </div>
+      <ol class="steps">
+        <li>
+          <p>Save the source below as <code>file_manager.py</code>.</p>
+        </li>
+        <li>
+          <p>Open a terminal in that folder and start it.</p>
+          <code class="cmd">python file_manager.py</code>
+        </li>
+        <li>
+          <p>On some systems the command is <code>python3</code>.</p>
+          <code class="cmd">python3 file_manager.py</code>
+        </li>
+      </ol>
+    </section>
+  </div>
+
+  <section class="band-dark" id="source" aria-labelledby="source-title">
+    <div class="wrap">
+      <div class="source-head">
+        <div>
+          <h2 id="source-title">The whole program</h2>
+          <p>Four functions, one unused stub and one menu loop, 104 lines in total.</p>
+        </div>
+        <button type="button" class="btn btn-small btn-light" id="copy-source">Copy source</button>
+      </div>
+      <pre class="code code-deep" tabindex="0" aria-label="Python source code"><code id="source-code">from pathlib import Path
+import os
+def createfile():
+    try:
+        filename = input("Enter the filename: ")
+        path  = Path(filename)
+        if not path.exists():
+            with open(filename, "w") as fs:
+                data = input("Enter the data to be written in the file")
+                fs.write(data)
+        else:
+            print("File already exists")
+    except Exception as err:
+        print(f"An error has occured {err}")
+
+def readfile():
+    try:
+        filename = input("Enter the filename: ")
+        path = Path(filename)
+        if path.exists():
+            with open (filename,"r") as fs:
+                content = fs.read()
+                print(f"Your content is \n {content}")
+        else:
+            print("No such file exists")
+    except Exception as err:
+        print(f"An error has occured {err}")
+
+def updatefile():
+    try:
+        filename = input("Name the file to update ")
+        path = Path(filename)
+
+        if path.exists():
+            print("To Rename the file press 1:")
+            print("To Append the file press 2:")
+            print("To Overwrite the file press 3:")
+            choice2 = int(input("Enter the choice"))
+            if choice2 == 1:
+                newname = input("Enter the New File Name: ")
+                new_path = Path(newname)
+                if not new_path.exists():
+                    path.rename(new_path)
+                    print("Renamed Successfuly")
+                else:
+                    print("The File already exists")
+            elif choice2 == 2:
+                with open(filename, "a") as fs:
+                    data = input("Enter the data to be appended: ")
+                    fs.write("\n"+ data)
+                print("Success")
+            elif choice2 == 3:
+                with open(filename, "w") as fs:
+                    data = input("Enter the data to be appended: ")
+                    fs.write("\n"+data)
+                print("Success")
+    except Exception as err:
+        print(f"An error has occured {err}")
+
+
+
+def deletefile():
+    try:
+        filename = input("Enter the filename: ")
+        path =  Path(filename)
+        if path.exists():
+            path.unlink()
+            print("Success")
+        else:
+            print("No such file")
+    except Exception as err:
+        print(f"An error has occured {err}")
+
+def exitfile():
+    return
+
+while True:
+    print("\n===== FILE MANAGEMENT SYSTEM =====")
+    print("1. Create a file")
+    print("2. Read a file")
+    print("3. Update a file")
+    print("4. Delete a file")
+    print("5. Exit")
+
+    choice = input("Enter your choice: ")
+
+    if choice == "1":
+        createfile()
+
+    elif choice == "2":
+        readfile()
+
+    elif choice == "3":
+        updatefile()
+
+    elif choice == "4":
+        deletefile()
+
+    elif choice == "5":
+        print("Exiting program. Goodbye!")
+        break
+
+    else:
+        print("Invalid choice! Please enter a number from 1 to 5.")</code></pre>
+      <p class="sr-only" id="copy-status" role="status"></p>
+    </div>
+  </section>
+
+  <div class="wrap">
+    <section class="split" id="notes" aria-labelledby="notes-title">
+      <div class="intro">
+        <h2 id="notes-title">Behavior worth knowing</h2>
+        <p>Small details that show up when you use it.</p>
+      </div>
+      <ul class="notes">
+        <li><strong>Overwrite starts with a blank line.</strong> Option 3 under Update writes a newline before your text, and its prompt says "appended".</li>
+        <li><strong>Other numbers at the Update menu do nothing.</strong> Anything besides 1, 2 or 3 returns to the main menu without a message.</li>
+        <li><strong>Letters instead of a number show a Python error.</strong> The program catches it and prints the error text after "An error has occured".</li>
+        <li><strong>Delete is immediate.</strong> The file is removed as soon as the name matches.</li>
+      </ul>
+    </section>
+  </div>
+
+  <section class="band-accent" aria-labelledby="cta-title">
+    <div class="wrap cta">
+      <div>
+        <h2 id="cta-title">Read it, run it, change it.</h2>
+        <p>The program is a single file with no dependencies. Clone the repo, run it in an empty folder, then try fixing one of the quirks listed above.</p>
+      </div>
+      <a class="btn btn-light" href="https://github.com/YOUR-USERNAME/YOUR-REPO">View source on GitHub</a>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap foot">
+    <p>A Python practice project.</p>
+    <nav aria-label="Footer">
+      <a href="https://github.com/YOUR-USERNAME/YOUR-REPO">Source on GitHub</a>
+      <a href="#top">Back to top</a>
+    </nav>
+  </div>
+</footer>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ---------- Program logic: mirrors the Python menu loop ---------- */
+
+  function PyError(message) { this.message = message; }
+
+  function pyRepr(s) {
+    return "'" + s.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
+  }
+
+  // Python's int() on a string: allows spaces, a sign and digits
+  function pyInt(s) {
+    if (/^\s*[+-]?\d+(_\d+)*\s*$/.test(s)) return parseInt(s.replace(/_/g, ''), 10);
+    throw new PyError('invalid literal for int() with base 10: ' + pyRepr(s));
+  }
+
+  // fs is a Map of filename -> content. out(text) prints a line.
+  // Each yield is an input() call: it yields the prompt and receives the typed text.
+  function createProgram(fs, out, onChange) {
+
+    function* createfile() {
+      var filename = yield 'Enter the filename: ';
+      if (filename === '') { out('File already exists'); return; }
+      if (!fs.has(filename)) {
+        var data = yield 'Enter the data to be written in the file';
+        fs.set(filename, data);
+        onChange();
+      } else {
+        out('File already exists');
+      }
+    }
+
+    function* readfile() {
+      var filename = yield 'Enter the filename: ';
+      if (filename === '') { out("An error has occured [Errno 2] No such file or directory: ''"); return; }
+      if (fs.has(filename)) {
+        out('Your content is \n ' + fs.get(filename));
+      } else {
+        out('No such file exists');
+      }
+    }
+
+    function* updatefile() {
+      var filename = yield 'Name the file to update ';
+      if (filename === '') { out('(Demo note: an empty file name is not simulated.)'); return; }
+      if (!fs.has(filename)) return;
+      out('To Rename the file press 1:');
+      out('To Append the file press 2:');
+      out('To Overwrite the file press 3:');
+      var choice2 = pyInt(yield 'Enter the choice');
+      if (choice2 === 1) {
+        var newname = yield 'Enter the New File Name: ';
+        if (newname !== '' && !fs.has(newname)) {
+          var content = fs.get(filename);
+          var next = new Map();
+          fs.forEach(function (v, k) { next.set(k === filename ? newname : k, k === filename ? content : v); });
+          fs.clear();
+          next.forEach(function (v, k) { fs.set(k, v); });
+          onChange();
+          out('Renamed Successfuly');
+        } else {
+          out('The File already exists');
+        }
+      } else if (choice2 === 2) {
+        var more = yield 'Enter the data to be appended: ';
+        fs.set(filename, fs.get(filename) + '\n' + more);
+        onChange();
+        out('Success');
+      } else if (choice2 === 3) {
+        var fresh = yield 'Enter the data to be appended: ';
+        fs.set(filename, '\n' + fresh);
+        onChange();
+        out('Success');
+      }
+    }
+
+    function* deletefile() {
+      var filename = yield 'Enter the filename: ';
+      if (filename === '') { out('(Demo note: an empty file name is not simulated.)'); return; }
+      if (fs.has(filename)) {
+        fs['delete'](filename);
+        onChange();
+        out('Success');
+      } else {
+        out('No such file');
+      }
+    }
+
+    function* guarded(task) {
+      try {
+        yield* task;
+      } catch (err) {
+        if (err instanceof PyError) out('An error has occured ' + err.message);
+        else throw err;
+      }
+    }
+
+    return (function* main() {
+      while (true) {
+        out('\n===== FILE MANAGEMENT SYSTEM =====');
+        out('1. Create a file');
+        out('2. Read a file');
+        out('3. Update a file');
+        out('4. Delete a file');
+        out('5. Exit');
+
+        var choice = yield 'Enter your choice: ';
+
+        if (choice === '1') yield* guarded(createfile());
+        else if (choice === '2') yield* guarded(readfile());
+        else if (choice === '3') yield* guarded(updatefile());
+        else if (choice === '4') yield* guarded(deletefile());
+        else if (choice === '5') { out('Exiting program. Goodbye!'); break; }
+        else out('Invalid choice! Please enter a number from 1 to 5.');
+      }
+    })();
+  }
+
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { createProgram: createProgram };
+  }
+  if (typeof document === 'undefined') return;
+
+  /* ---------- Demo wiring ---------- */
+
+  var MENU_PROMPT = 'Enter your choice: ';
+  var SAMPLE = ['1', 'notes.txt', 'hello world', '2', 'notes.txt', '3', 'notes.txt', '2', 'a second line', '2', 'notes.txt', '1', 'notes.txt', '5'];
+
+  var screen = document.getElementById('screen');
+  var form = document.getElementById('term-form');
+  var input = document.getElementById('term-input');
+  var sendBtn = document.getElementById('term-send');
+  var restartBtn = document.getElementById('restart');
+  var playBtn = document.getElementById('play');
+  var chips = document.querySelectorAll('#quick button');
+  var fileList = document.getElementById('file-list');
+  var fileEmpty = document.getElementById('file-empty');
+  var statusEl = document.getElementById('term-status');
+
+  var reduceMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  var files, gen, currentLine;
+  var interacted = false, atMenu = false, ended = false, playing = false, playToken = 0;
+
+  function out(text) {
+    var div = document.createElement('div');
+    div.className = 'line';
+    div.textContent = text;
+    screen.appendChild(div);
+    screen.scrollTop = screen.scrollHeight;
+  }
+
+  function bytes(s) { return new TextEncoder().encode(s).length; }
+
+  function refreshFiles() {
+    fileList.textContent = '';
+    fileEmpty.hidden = files.size > 0;
+    files.forEach(function (content, name) {
+      var li = document.createElement('li');
+      var a = document.createElement('span');
+      a.textContent = name;
+      var b = document.createElement('span');
+      var n = bytes(content);
+      b.textContent = n + (n === 1 ? ' byte' : ' bytes');
+      li.appendChild(a);
+      li.appendChild(b);
+      fileList.appendChild(li);
+    });
+  }
+
+  function setControls() {
+    var locked = ended || playing;
+    input.disabled = locked;
+    sendBtn.disabled = locked;
+    for (var i = 0; i < chips.length; i++) chips[i].disabled = locked || !atMenu;
+    playBtn.textContent = playing ? 'Stop sample' : 'Play sample session';
+    playBtn.setAttribute('aria-pressed', playing ? 'true' : 'false');
+  }
+
+  function showPrompt(text) {
+    currentLine = document.createElement('div');
+    currentLine.className = 'line';
+    var p = document.createElement('span');
+    p.className = 'p';
+    p.textContent = text;
+    currentLine.appendChild(p);
+    currentLine.dataset.gap = /\s$/.test(text) ? '' : '1';
+    screen.appendChild(currentLine);
+    screen.scrollTop = screen.scrollHeight;
+    atMenu = text === MENU_PROMPT;
+    setControls();
+    if (interacted && !input.disabled) input.focus();
+  }
+
+  function finish() {
+    ended = true;
+    atMenu = false;
+    playing = false;
+    playToken++;
+    setControls();
+    statusEl.textContent = 'Program ended. Use Restart to run it again.';
+    out('\n[Program ended. Press Restart to run it again.]');
+    if (interacted) restartBtn.focus();
+  }
+
+  function advance(value) {
+    var r;
+    try {
+      r = gen.next(value);
+    } catch (e) {
+      out('Demo error: ' + (e && e.message ? e.message : e));
+      finish();
+      return;
+    }
+    if (r.done) finish();
+    else showPrompt(r.value);
+  }
+
+  function start() {
+    files = new Map();
+    screen.textContent = '';
+    input.value = '';
+    ended = false;
+    atMenu = false;
+    statusEl.textContent = '';
+    refreshFiles();
+    gen = createProgram(files, out, refreshFiles);
+    advance();
+  }
+
+  function submitValue(value) {
+    var echo = document.createElement('span');
+    echo.className = 'echo' + (currentLine.dataset.gap ? ' gap' : '');
+    echo.textContent = value;
+    currentLine.appendChild(echo);
+    input.value = '';
+    advance(value);
+  }
+
+  function sleep(ms, token) {
+    return new Promise(function (resolve) {
+      setTimeout(function () { resolve(token === playToken); }, ms);
+    });
+  }
+
+  async function playSample() {
+    playToken++;
+    var token = playToken;
+    playing = false;
+    start();
+    playing = true;
+    setControls();
+    for (var s = 0; s < SAMPLE.length; s++) {
+      var v = SAMPLE[s];
+      if (!(await sleep(reduceMotion ? 250 : 600, token))) return;
+      if (reduceMotion) {
+        input.value = v;
+      } else {
+        for (var i = 1; i <= v.length; i++) {
+          input.value = v.slice(0, i);
+          if (!(await sleep(45, token))) return;
+        }
+        if (!(await sleep(200, token))) return;
+      }
+      submitValue(v);
+    }
+    if (token === playToken) { playing = false; setControls(); }
+  }
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    if (input.disabled) return;
+    interacted = true;
+    submitValue(input.value);
+  });
+
+  for (var c = 0; c < chips.length; c++) {
+    chips[c].addEventListener('click', function (e) {
+      if (!atMenu || playing || ended) return;
+      interacted = true;
+      submitValue(e.currentTarget.getAttribute('data-v'));
+    });
+  }
+
+  restartBtn.addEventListener('click', function () {
+    interacted = true;
+    playToken++;
+    playing = false;
+    start();
+    input.focus();
+  });
+
+  playBtn.addEventListener('click', function () {
+    if (playing) {
+      playToken++;
+      playing = false;
+      setControls();
+      interacted = true;
+      if (!input.disabled) input.focus();
+    } else {
+      playSample();
+    }
+  });
+
+  start();
+
+  /* ---------- Dry run of createfile() ---------- */
+
+  var STEPS = [
+    { line: 5, run: 'Run 1: notes.txt does not exist yet', title: 'input() waits for you',
+      text: 'The program stops here until you type something. You type notes.txt and press Enter.',
+      v: { filename: '"notes.txt"', exists: 'not checked yet', data: 'not asked yet', disk: 'no file yet' } },
+    { line: 6, run: 'Run 1: notes.txt does not exist yet', title: 'A Path object, not a file',
+      text: 'Path(filename) only builds an object that describes a location. Nothing is created or read on disk.',
+      v: { filename: '"notes.txt"', exists: 'not checked yet', data: 'not asked yet', disk: 'no file yet' } },
+    { line: 7, run: 'Run 1: notes.txt does not exist yet', title: 'Does it exist yet?',
+      text: 'path.exists() looks in the current folder. There is no notes.txt, so it returns False. The condition is not False, which is True, so the if branch runs.',
+      v: { filename: '"notes.txt"', exists: 'False', data: 'not asked yet', disk: 'no file yet' } },
+    { line: 8, run: 'Run 1: notes.txt does not exist yet', title: 'open() in "w" mode creates it',
+      text: 'Opening in write mode creates an empty notes.txt immediately, before the program has asked for any text.',
+      v: { filename: '"notes.txt"', exists: 'False', data: 'not asked yet', disk: 'notes.txt (empty)' } },
+    { line: 9, run: 'Run 1: notes.txt does not exist yet', title: 'A second input()',
+      text: 'The program asks for the text to store. You type hello world.',
+      v: { filename: '"notes.txt"', exists: 'False', data: '"hello world"', disk: 'notes.txt (empty)' } },
+    { line: 10, run: 'Run 1: notes.txt does not exist yet', title: 'Write, then close',
+      text: 'fs.write puts the text into the file. When the with block ends, Python closes the file for you.',
+      v: { filename: '"notes.txt"', exists: 'False', data: '"hello world"', disk: 'notes.txt: hello world' } },
+    { line: 7, run: 'Run 2: same name again', title: 'Same name, second time',
+      text: 'You choose option 1 again and type notes.txt. Now path.exists() returns True, so not True is False and Python skips the if branch.',
+      v: { filename: '"notes.txt"', exists: 'True', data: 'not asked yet', disk: 'notes.txt: hello world' } },
+    { line: 12, run: 'Run 2: same name again', title: 'The else branch',
+      text: 'It prints File already exists. Your first file is untouched, and the function returns to the menu.',
+      v: { filename: '"notes.txt"', exists: 'True', data: 'not asked yet', disk: 'notes.txt: hello world' } }
+  ];
+
+  var trace = document.getElementById('trace');
+  if (trace) {
+    var idx = 0;
+    var lineEls = trace.querySelectorAll('[data-n]');
+    var tRun = document.getElementById('t-run');
+    var tTitle = document.getElementById('t-title');
+    var tText = document.getElementById('t-text');
+    var tCount = document.getElementById('t-count');
+    var tPrev = document.getElementById('t-prev');
+    var tNext = document.getElementById('t-next');
+    var vEls = {
+      filename: document.getElementById('v-filename'),
+      exists: document.getElementById('v-exists'),
+      data: document.getElementById('v-data'),
+      disk: document.getElementById('v-disk')
+    };
+
+    function renderStep() {
+      var s = STEPS[idx];
+      for (var i = 0; i < lineEls.length; i++) {
+        var on = Number(lineEls[i].getAttribute('data-n')) === s.line;
+        lineEls[i].classList.toggle('on', on);
+        if (on) lineEls[i].setAttribute('aria-current', 'step');
+        else lineEls[i].removeAttribute('aria-current');
+      }
+      tRun.textContent = s.run;
+      tTitle.textContent = s.title;
+      tText.textContent = s.text;
+      for (var k in vEls) vEls[k].textContent = s.v[k];
+      tCount.textContent = 'Step ' + (idx + 1) + ' of ' + STEPS.length;
+      tPrev.disabled = idx === 0;
+      tNext.textContent = idx === STEPS.length - 1 ? 'Start over' : 'Next step';
+    }
+
+    tPrev.addEventListener('click', function () { if (idx > 0) { idx--; renderStep(); } });
+    tNext.addEventListener('click', function () {
+      idx = idx === STEPS.length - 1 ? 0 : idx + 1;
+      renderStep();
+    });
+    renderStep();
+  }
+
+  /* ---------- Copy source ---------- */
+
+  var copyBtn = document.getElementById('copy-source');
+  var codeEl = document.getElementById('source-code');
+  var copyStatus = document.getElementById('copy-status');
+  if (copyBtn && codeEl) {
+    copyBtn.addEventListener('click', function () {
+      var text = codeEl.textContent;
+      function done(ok) {
+        copyBtn.textContent = ok ? 'Copied' : 'Copy failed';
+        copyStatus.textContent = ok ? 'Source copied to clipboard.' : 'Could not copy. Select the code and copy it manually.';
+        setTimeout(function () { copyBtn.textContent = 'Copy source'; }, 2000);
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(false); });
+      } else {
+        done(false);
+      }
+    });
+  }
+})();
+
+</script>
+</body>
+</html>
